@@ -1,3 +1,5 @@
+from datetime import date
+
 import model
 from sqlalchemy.orm import Session
 from sqlalchemy.util import deprecations
@@ -39,3 +41,16 @@ def test_orderline_mapper_can_save_lines(session):
 
     assert rows == [("order1", "DECORATIVE-WIDGET", 12)]
 
+
+def test_batches(session):
+    session.execute(
+        "INSERT INTO batches VALUES ('batch1', 'sku1', 100, null)"
+    )
+    session.execute(
+        "INSERT INTO batches VALUES ('batch2', 'sku2', 200, '2023-07-13')"
+    )
+    expected = [
+        model.Batch('batch1', 'sku1', 100, eta=None),
+        model.Batch('batch2', 'sku2', 200, eta=date(2023, 7, 13))
+    ]
+    assert session.query(model.Batch).all() == expected

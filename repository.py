@@ -13,7 +13,7 @@ class AbstractRepository(abc.ABC):
         pass
 
 
-class SqlAlchemyRepository(AbstractRepository):
+class SqlRepository(AbstractRepository):
     def __init__(self, session: Session):
         self.session = session
 

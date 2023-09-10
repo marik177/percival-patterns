@@ -1,7 +1,5 @@
 import abc
 
-import sqlalchemy
-
 import model
 
 
@@ -30,10 +28,11 @@ class SqlRepository(AbstractRepository):
         allocations = []
         for order_id in orderlines_in_batch:
             allocations.append(self.session.execute(
-                "SELECT orderid, sku, qty FROM order_lines WHERE orderid=:order_id", dict(order_id=order_id)).fetchone(),
-            )
-        for orerline in allocations:
-            batch._allocations.add(model.OrderLine(*orerline))
+                "SELECT orderid, sku, qty FROM order_lines WHERE orderid=:order_id",
+                dict(order_id=order_id)).fetchone(),
+                               )
+        for oderline in allocations:
+            batch._allocations.add(model.OrderLine(*oderline))
         return batch
 
     def add(self, batch: model.Batch):
@@ -43,6 +42,23 @@ class SqlRepository(AbstractRepository):
             dict(reference=batch.reference, sku=batch.sku,
                  purchased_quantity=batch._purchased_quantity, eta=batch.eta)
         )
+
+        if batch._allocations:
+            batch_id = get_batch_id(self.session, batch.reference)
+            for order_line in batch._allocations:
+                self.session.execute(
+                    "INSERT OR IGNORE INTO order_lines (orderid, sku, qty) VALUES "
+                    "(:orderid, :sku, :qty)",
+                    dict(orderid=order_line.orderid, sku=order_line.sku, qty=order_line.qty)
+
+                )
+                order_line_id = get_order_line_id(self.session, order_line.orderid, order_line.sku)
+
+                self.session.execute(
+                    "INSERT OR IGNORE INTO allocations (orderline_id, batch_id) VALUES"
+                    "(:orderline_id, :batch_id)",
+                    dict(orderline_id=order_line_id, batch_id=batch_id)
+                )
 
 
 def get_allocations(session, batchid):
@@ -57,3 +73,19 @@ def get_allocations(session, batchid):
         )
     )
     return {row[0] for row in rows}
+
+
+def get_batch_id(session, batch_ref):
+    batch_id = session.execute(
+        "SELECT id FROM batches WHERE reference=:batch_ref",
+        dict(batch_ref=batch_ref)).fetchone()['id']
+
+    return batch_id
+
+
+def get_order_line_id(session, orderid, sku):
+    order_line_id = session.execute(
+        "SELECT id FROM order_lines WHERE orderid=:orderid AND sku=:sku",
+        dict(orderid=orderid, sku=sku)
+    ).fetchone()['id']
+    return order_line_id

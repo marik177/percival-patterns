@@ -2,6 +2,7 @@ import model
 import repository
 from sqlalchemy.orm import Session
 from sqlalchemy.util import deprecations
+from repository import get_allocations
 
 deprecations.SILENCE_UBER_WARNING = 1
 
@@ -30,15 +31,15 @@ def insert_order_line(session):
     return order_line_id
 
 
-def insert_batch(session, batch_id):
+def insert_batch(session, batch_ref):
     session.execute(
         "INSERT INTO batches (reference, sku, _purchased_quantity, eta) VALUES "
         "(:reference,'GENERIC-SOFA', 100, null)",
-        dict(reference=batch_id)
+        dict(reference=batch_ref)
     )
     [[batch_id]] = session.execute(
-        "SELECT id FROM batches WHERE reference=:batch_id AND sku='GENERIC-SOFA'",
-        dict(batch_id=batch_id, sku='GENERIC-SOFA')
+        "SELECT id FROM batches WHERE reference=:batch_ref AND sku='GENERIC-SOFA'",
+        dict(batch_ref=batch_ref, sku='GENERIC-SOFA')
     )
     return batch_id
 
@@ -66,4 +67,22 @@ def test_repository_can_retrieve_a_batch_with_allocations(session):
     assert retrieved._allocations == {
         model.OrderLine("order1", "GENERIC-SOFA", 12),
     }
+
+
+def test_updating_a_batch(session):
+    order1 = model.OrderLine("order1", "WEATHERED-BENCH", 10)
+    order2 = model.OrderLine("order2", "WEATHERED-BENCH", 20)
+    batch = model.Batch("batch1", "WEATHERED-BENCH", 100, eta=None)
+    batch.allocate(order1)
+
+    repo = repository.SqlRepository(session)
+    repo.add(batch)
+    session.commit()
+
+    batch.allocate(order2)
+    repo.add(batch)
+    session.commit()
+    assert get_allocations(session, batch.reference) == {"order1", "order2"}
+
+
 

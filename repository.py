@@ -18,13 +18,12 @@ class SqlAlchemyRepository(AbstractRepository):
         self.session = session
 
     def get(self, reference):
-        return self.session.query(model.Batch).filter_by(reference=reference).one()
+        pass
 
     def add(self, batch: model.Batch):
-        return self.session.add(batch)
+        pass
 
-    def list(self):
-        return self.session.query(model.Batch).all()
+
 
 
 

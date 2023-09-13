@@ -1,7 +1,7 @@
 import tempfile
 import shutil
 from pathlib import Path
-from sync import sync, determine_actions
+from sync import sync, FileSystem
 
 
 class TestE2E:
@@ -45,15 +45,45 @@ class TestE2E:
             shutil.rmtree(dest)
 
 
+class FakeFileSystem:
+    def __init__(self, paths_hashes):
+        self.paths_hashes = paths_hashes
+        self.actions = []
+
+    def read(self, path):
+        return self.paths_hashes[path]
+
+    def copy(self, src, dest):
+        self.actions.append(('copy', src, dest))
+
+    def move(self, src, dest):
+        self.actions.append(('move', src, dest))
+
+    def delete(self, dest):
+        self.actions.append(('delete', dest))
+
+
 def test_when_a_file_exists_in_the_source_but_not_the_destination():
     source_hash = {'hash1': 'fn1'}
     dest_hash = {}
-    actions = determine_actions(source_hash, dest_hash, Path('/src'), Path('/dest'))
-    assert list(actions) == [('copy', Path('/src/fn1'), Path('/dest/fn1'))]
+    fakers = FakeFileSystem(
+        {'/src': source_hash,
+         '/dest': dest_hash
+         })
+    sync('/src', '/dest', filesystem=fakers)
+
+    assert fakers.actions == [('copy', Path('/src/fn1'), Path('/dest/fn1'))]
 
 
 def test_when_a_file_has_been_renamed_in_the_source():
     source_hash = {'hash1': 'fn1'}
     dest_hash = {'hash1': 'fn2'}
-    actions = determine_actions(source_hash, dest_hash, Path('/src'), Path('/dest'))
-    assert list(actions) == [('move', Path('/dest/fn2'), Path('/dest/fn1'))]
+    fakers = FakeFileSystem(
+        {
+            '/src': source_hash,
+            '/dest': dest_hash,
+        }
+    )
+    sync('/src', '/dest', filesystem=fakers)
+
+    assert fakers.actions == [('move', Path('/dest/fn2'), Path('/dest/fn1'))]

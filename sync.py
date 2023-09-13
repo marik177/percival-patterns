@@ -1,36 +1,55 @@
 import hashlib
-from pathlib import Path
 import os
 import shutil
+from pathlib import Path
+
+
+class FileSystem:
+
+    def read(self, path):
+        return read_paths_and_hashes(path)
+
+    def copy(self, source, dest):
+        shutil.copyfile(source, dest)
+
+    def move(self, source, dest):
+        shutil.move(source, dest)
+
+    def delete(self, dest):
+        os.remove(dest)
+
+
+def sync(source, dest, filesystem=FileSystem()):
+    source_hashes = filesystem.read(source)
+    dest_hashes = filesystem.read(dest)
+
+    for sha, filename in source_hashes.items():
+        if sha not in dest_hashes:
+            sourcepath = Path(source) / filename
+            destpath = Path(dest) / filename
+            filesystem.copy(sourcepath, destpath)
+
+        elif dest_hashes[sha] != filename:
+            olddestpath = Path(dest) / dest_hashes[sha]
+            newdestpath = Path(dest) / filename
+            filesystem.move(olddestpath, newdestpath)
+
+    for sha, filename in dest_hashes.items():
+        if sha not in source_hashes:
+            filesystem.delete(dest / filename)
+
 
 BLOCKSIZE = 65536
 
 
-def hash_file(path: Path):
+def hash_file(path):
     hasher = hashlib.sha1()
-    with path.open('rb') as file:
+    with path.open("rb") as file:
         buf = file.read(BLOCKSIZE)
         while buf:
             hasher.update(buf)
             buf = file.read(BLOCKSIZE)
     return hasher.hexdigest()
-
-
-def sync(source, dest):
-    # imperative shell step 1, gather inputs
-    source_hashes = read_paths_and_hashes(source)
-    dest_hashes = read_paths_and_hashes(dest)
-
-    # step 2: call functional core
-    actions = determine_actions(source_hashes, dest_hashes, source, dest)
-    # imperative shell step 3, apply outputs
-    for action, *paths in actions:
-        if action == 'copy':
-            shutil.copy(*paths)
-        if action == 'move':
-            shutil.move(*paths)
-        if action == 'delete':
-            os.remove(paths[0])
 
 
 def read_paths_and_hashes(root):
@@ -41,21 +60,5 @@ def read_paths_and_hashes(root):
     return hashes
 
 
-def determine_actions(source_hashes, dest_hashes, source_folder, dest_folder):
-    for sha, filename in source_hashes.items():
-        if sha not in dest_hashes:
-            source_path = Path(source_folder) / filename
-            dest_path = Path(dest_folder) / filename
-            yield 'copy', source_path, dest_path
-        elif dest_hashes[sha] != filename:
-            olddestpath = Path(dest_folder)/dest_hashes[sha]
-            newdesppath = Path(dest_folder)/filename
-            yield 'move', olddestpath, newdesppath
-
-    for sha, filename in dest_hashes.items():
-        if sha not in source_hashes:
-            yield 'delete', Path(dest_folder) / filename
-
-
-
-
+# sync('/home/marik/PycharmProjects/pythonProject/my_examples/algorithm',
+#      '/home/marik/PycharmProjects/pythonProject/my_examples/algorithm_new')

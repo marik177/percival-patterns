@@ -5,6 +5,7 @@ import orm
 import config
 import repository
 import model
+import services
 
 
 orm.start_mappers()
@@ -24,13 +25,10 @@ def allocate_endpoint():
     line = model.OrderLine(
         request.json["orderid"], request.json["sku"], request.json["qty"],
     )
-    if not is_valid(line.sku, batches):
-        return jsonify({'message': f"Invalid sku {line.sku}"}), 400
     try:
-        batchref = model.allocate(line, batches)
+        batchref = services.allocate(line, batches, session)
     except model.OutOfStock as e:
         return jsonify({"message": str(e)}), 400
-    session.commit()
     return jsonify({"batchref": batchref}), 201
 
 

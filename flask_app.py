@@ -7,7 +7,6 @@ import repository
 import model
 import services
 
-
 orm.start_mappers()
 engine = create_engine(config.get_postgres_uri())
 get_session = sessionmaker(bind=engine)
@@ -32,6 +31,15 @@ def allocate_endpoint():
         return jsonify({"message": str(e)}), 400
     except services.InvalidSku as e:
         return jsonify({"message": str(e)}), 400
+    return jsonify({"batchref": batchref}), 201
+
+
+@app.route('/deallocate', methods=["POST"])
+def deallocate():
+    session = get_session()
+    repo = repository.SqlAlchemyRepository(session)
+    orderid, sku = request.json['orderid'], request.json['sku']
+    batchref = services.deallocate(orderid, sku, repo, session)
     return jsonify({"batchref": batchref}), 201
 
 

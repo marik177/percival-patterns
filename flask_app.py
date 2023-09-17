@@ -39,7 +39,8 @@ def deallocate():
     session = get_session()
     repo = repository.SqlAlchemyRepository(session)
     orderid, sku = request.json['orderid'], request.json['sku']
-    batchref = services.deallocate(orderid, sku, repo, session)
+    batch_line = services.get_batch_and_line_from_orderid_and_sku(orderid, sku, session)
+    batchref = services.deallocate(*batch_line, repo, session)
     return jsonify({"batchref": batchref}), 201
 
 
